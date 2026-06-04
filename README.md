@@ -223,3 +223,6 @@ After you run UI:
 
 ```markdown
 ## 📸 UI Preview
+
+
+![Biomedical RAG UI](assets/UI.png)

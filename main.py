@@ -1,10 +1,25 @@
 from fastapi import FastAPI
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 from ingest import load_data
 from vector_store import VectorStore
 from rag_engine import RAGEngine
 import uvicorn
 
 app = FastAPI()
+
+# ✅ FIX: middleware AFTER app creation
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# request model
+class ChatRequest(BaseModel):
+    message: str
 
 print("📥 Loading data...")
 embeddings, texts, bm25 = load_data()
@@ -19,11 +34,12 @@ rag = RAGEngine(vs, texts, bm25)
 def home():
     return {"status": "Biomedical RAG API running"}
 
-@app.get("/chat")
-def chat(q: str):
-    answer = rag.generate(q)
+# ✅ FIX: POST instead of GET
+@app.post("/chat")
+def chat(req: ChatRequest):
+    answer = rag.generate(req.message)
     return {
-        "question": q,
+        "question": req.message,
         "answer": answer
     }
 

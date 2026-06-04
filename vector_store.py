@@ -20,18 +20,22 @@ class VectorStore:
             PointStruct(
                 id=str(uuid.uuid4()),
                 vector=embeddings[i].tolist(),
-                payload={"text": texts[i], "idx": i}
+                payload={"text": texts[i]}
             )
             for i in range(len(texts))
         ]
 
-        self.client.upsert(self.collection, points)
-
-    def search(self, query_vector, top_k=5):
-        results = self.client.search(
+        self.client.upsert(
             collection_name=self.collection,
-            query_vector=query_vector.tolist(),
+            points=points
+        )
+
+    # ✅ FIXED HERE (NEW QDRANT API)
+    def search(self, query_vector, top_k=5):
+        results = self.client.query_points(
+            collection_name=self.collection,
+            query=query_vector.tolist(),
             limit=top_k
         )
 
-        return results
+        return [point.payload["text"] for point in results.points]

@@ -9,7 +9,7 @@ def load_data():
     dataset = load_dataset(
         "keivalya/MedQuad-MedicalQnADataset",
         split="train"
-    ).select(range(800))
+    ).select(range(5000))
 
     texts = []
 
@@ -17,19 +17,16 @@ def load_data():
         q = item.get("Question", "")
         a = item.get("Answer", "")
 
-        if q and a and len(a) > 30:
+        if q and a and len(a) > 40:
             texts.append(f"Q: {q}\nA: {a}")
 
     print(f"📄 Documents loaded: {len(texts)}")
 
-    # ---------------- EMBEDDINGS ----------------
-    embeddings = embedding_model.encode(
-        texts,
-        show_progress_bar=True,
-        normalize_embeddings=True
-    ).astype("float32")
+    # embeddings
+    embeddings = embedding_model.encode(texts, show_progress_bar=True)
+    embeddings = np.array(embeddings).astype("float32")
 
-    # ---------------- BM25 ----------------
+    # BM25
     tokenized_docs = [t.lower().split() for t in texts]
     bm25 = BM25Okapi(tokenized_docs)
 

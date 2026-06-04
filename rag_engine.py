@@ -15,44 +15,41 @@ class RAGEngine:
         self.texts = texts
         self.bm25 = bm25
 
-    # ---------------- EMBED ----------------
     def embed(self, text):
-        return embedding_model.encode(
-            text,
-            normalize_embeddings=True
-        ).astype("float32")
+        return embedding_model.encode(text).astype("float32")
 
-    # ---------------- HYBRID RETRIEVAL ----------------
-    def retrieve(self, query):
-
-        # 1. VECTOR SEARCH (Qdrant)
+    # ✅ HYBRID SEARCH (BM25 + VECTOR)
+    def retrieve(self, query, k=5):
+        # vector search
         q_vec = self.embed(query)
-        vector_results = self.vs.search(q_vec, top_k=5)
-        vector_texts = [r.payload["text"] for r in vector_results]
+        vector_results = self.vs.search(q_vec, top_k=k)
 
-        # 2. BM25 SEARCH
+        # BM25 search
         tokens = query.lower().split()
         bm25_scores = self.bm25.get_scores(tokens)
-        top_bm25 = np.argsort(bm25_scores)[-5:]
+        top_bm25_idx = np.argsort(bm25_scores)[-k:]
 
-        bm25_texts = [self.texts[i] for i in top_bm25]
+        bm25_results = [self.texts[i] for i in top_bm25_idx]
 
-        # 3. MERGE RESULTS
-        combined = list(set(vector_texts + bm25_texts))
+        # merge results
+        return list(set(vector_results + bm25_results))
 
-        return combined[:8]
-
-    # ---------------- GENERATION ----------------
     def generate(self, query):
-
         docs = self.retrieve(query)
 
-        context = "\n\n".join(docs)
+        context = "\n\n".join(
+            [f"[DOC {i+1}] {doc}" for i, doc in enumerate(docs)]
+        )
 
         prompt = f"""
 You are a biomedical AI assistant.
 
 Use ONLY the context below.
+
+You MUST cite sources like [DOC 1].
+
+If answer is not in context say:
+"Not enough medical evidence in provided documents."
 
 Context:
 {context}
@@ -60,15 +57,14 @@ Context:
 Question:
 {query}
 
-Rules:
-- If answer is not in context say:
-  "Not enough medical evidence in provided documents."
-- Be precise and medically accurate.
+Answer:
 """
 
-        response = client.models.generate_content(
-            model="models/gemini-2.5-flash",
-            contents=prompt
-        )
-
-        return response.text
+        try:
+            response = client.models.generate_content(
+                model="models/gemini-2.5-flash",
+                contents=prompt
+            )
+            return response.text
+        except Exception as e:
+            return f"LLM error: {str(e)}"
